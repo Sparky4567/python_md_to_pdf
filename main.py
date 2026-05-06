@@ -1,0 +1,74 @@
+from pathlib import Path
+import markdown
+from weasyprint import HTML
+
+# --- CONFIG ---
+INPUT_DIR = Path("notes")        # folder with .md files
+OUTPUT_FILE = Path("output.pdf") # final PDF
+SORT_MODE = "name"               # "name" or "time"
+
+# --- STEP 1: Collect markdown files ---
+def get_markdown_files(directory: Path):
+    files = list(directory.rglob("*.md"))
+    
+    if SORT_MODE == "time":
+        files.sort(key=lambda f: f.stat().st_mtime)
+    else:
+        files.sort()  # alphabetical
+    
+    return files
+
+# --- STEP 2: Convert all markdown to one HTML ---
+def merge_markdown(files):
+    html_parts = []
+    
+    for file in files:
+        text = file.read_text(encoding="utf-8")
+        html = markdown.markdown(text)
+        
+        # Optional: add file title separator
+        html_parts.append(f"<h1>{file.stem}</h1>\n{html}")
+    
+    return "\n<hr>\n".join(html_parts)
+
+# --- STEP 3: Wrap into full HTML document ---
+def build_html_document(body: str):
+    return f"""
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: sans-serif; line-height: 1.6; }}
+            h1 {{ border-bottom: 1px solid #ccc; }}
+            hr {{ margin: 40px 0; }}
+        </style>
+    </head>
+    <body>
+        {body}
+    </body>
+    </html>
+    """
+
+# --- STEP 4: Convert HTML to PDF ---
+def html_to_pdf(html_content: str, output: Path):
+    HTML(string=html_content).write_pdf(output)
+
+# --- MAIN ---
+def main():
+    md_files = get_markdown_files(INPUT_DIR)
+    
+    if not md_files:
+        print("No markdown files found.")
+        return
+    
+    print(f"Found {len(md_files)} files.")
+    
+    merged_html = merge_markdown(md_files)
+    full_html = build_html_document(merged_html)
+    
+    html_to_pdf(full_html, OUTPUT_FILE)
+    
+    print(f"PDF created at: {OUTPUT_FILE.resolve()}")
+
+if __name__ == "__main__":
+    main()
